@@ -5,6 +5,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from graph import build_graph
+from output import ascii_tree, label, load_order, plantuml
+from registry import Registry, dependency_name
 from output import label, load_order
 
 VERSION = (
@@ -24,7 +26,14 @@ def parse_args(argv=None):
     parser.add_argument("--ascii", action="store_true", dest="ascii_tree")
     parser.add_argument("--max-depth", type=int)
     parser.add_argument("--exclude")
+    parser.add_argument(
+        "--mode", choices=("graph", "direct", "order"), default="graph",
+    )
     args = parser.parse_args(argv)
+    if args.test and args.mode == "direct":
+        parser.error("--mode direct requires a Cargo registry")
+    if args.ascii_tree and args.mode != "graph":
+        parser.error("--ascii requires --mode graph")
     name = r"[A-Z]+" if args.test else r"[A-Za-z0-9_-]+"
     if not re.fullmatch(name, args.package):
         parser.error("invalid --package")
@@ -47,15 +56,38 @@ def parse_args(argv=None):
     return args
 
 
+def print_direct(args):
+    """Показать все строки прямых зависимостей из индекса."""
+    record = Registry(args.repo).exact(args.package, args.version)
+    for dep in record["deps"]:
+        details = [dep.get("kind") or "normal"]
+        if dep.get("optional"):
+            details.append("optional")
+        if dep.get("target"):
+            details.append(dep["target"])
+        name = dependency_name(dep)
+        print(f"{name} {dep['req']} ({', '.join(details)})")
+
+
 def main():
-    """Напечатать порядок зависимостей."""
+    """Выполнить выбранную операцию над зависимостями."""
     args = parse_args()
     try:
-        order, cyclic = load_order(build_graph(args))
-        for node in order:
-            print(label(node))
-        if cyclic:
-            print("Cycle blocks: " + ", ".join(map(label, cyclic)))
+        if args.mode == "direct":
+            print_direct(args)
+            return
+        graph = build_graph(args)
+        if args.mode == "order":
+            order, cyclic = load_order(graph)
+            for node in order:
+                print(label(node))
+            if cyclic:
+                print("Cycle blocks: " + ", ".join(map(label, cyclic)))
+        else:
+            print(plantuml(graph))
+            if args.ascii_tree:
+                print()
+                print(ascii_tree(graph))
     except (OSError, ValueError) as error:
         raise SystemExit(f"error: {error}") from None
 
