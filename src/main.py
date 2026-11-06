@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from registry import Registry, dependency_name
+from graph import build_graph
 
 VERSION = (
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
@@ -47,13 +47,11 @@ def parse_args(argv=None):
 
 
 def main():
-    """Напечатать прямые зависимости выбранной версии."""
+    """Построить граф и напечатать список смежности."""
     args = parse_args()
     try:
-        record = Registry(args.repo).exact(args.package, args.version)
-        for dep in record["deps"]:
-            kind = dep.get("kind") or "normal"
-            print(f"{dependency_name(dep)} {dep['req']} ({kind})")
+        for node, children in build_graph(args).items():
+            print(node, children)
     except (OSError, ValueError) as error:
         raise SystemExit(f"error: {error}") from None
 
