@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from registry import Registry, dependency_name
+
 VERSION = (
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
@@ -45,9 +47,15 @@ def parse_args(argv=None):
 
 
 def main():
-    """Вывести настройки прототипа."""
-    for key, value in vars(parse_args()).items():
-        print(f"{key}={value}")
+    """Напечатать прямые зависимости выбранной версии."""
+    args = parse_args()
+    try:
+        record = Registry(args.repo).exact(args.package, args.version)
+        for dep in record["deps"]:
+            kind = dep.get("kind") or "normal"
+            print(f"{dependency_name(dep)} {dep['req']} ({kind})")
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"error: {error}") from None
 
 
 if __name__ == "__main__":
