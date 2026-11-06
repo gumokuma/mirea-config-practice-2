@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from graph import build_graph
+from output import label, load_order
 
 VERSION = (
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
@@ -47,11 +48,14 @@ def parse_args(argv=None):
 
 
 def main():
-    """Построить граф и напечатать список смежности."""
+    """Напечатать порядок зависимостей."""
     args = parse_args()
     try:
-        for node, children in build_graph(args).items():
-            print(node, children)
+        order, cyclic = load_order(build_graph(args))
+        for node in order:
+            print(label(node))
+        if cyclic:
+            print("Cycle blocks: " + ", ".join(map(label, cyclic)))
     except (OSError, ValueError) as error:
         raise SystemExit(f"error: {error}") from None
 
