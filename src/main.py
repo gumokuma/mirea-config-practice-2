@@ -7,7 +7,6 @@ from urllib.parse import urlsplit
 from graph import build_graph
 from output import ascii_tree, label, load_order, plantuml
 from registry import Registry, dependency_name
-from output import label, load_order
 
 VERSION = (
     r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
@@ -30,10 +29,7 @@ def parse_args(argv=None):
         "--mode", choices=("graph", "direct", "order"), default="graph",
     )
     args = parser.parse_args(argv)
-    if args.test and args.mode == "direct":
-        parser.error("--mode direct requires a Cargo registry")
-    if args.ascii_tree and args.mode != "graph":
-        parser.error("--ascii requires --mode graph")
+    validate_mode(parser, args)
     name = r"[A-Z]+" if args.test else r"[A-Za-z0-9_-]+"
     if not re.fullmatch(name, args.package):
         parser.error("invalid --package")
@@ -43,17 +39,30 @@ def parse_args(argv=None):
         parser.error("--max-depth must be non-negative")
     if args.exclude is not None and not args.exclude.strip():
         parser.error("--exclude must not be empty")
+    validate_repository(parser, args)
+    return args
+
+
+def validate_mode(parser, args):
+    """Проверить совместимость режима и параметров вывода."""
+    if args.test and args.mode == "direct":
+        parser.error("--mode direct requires a Cargo registry")
+    if args.ascii_tree and args.mode != "graph":
+        parser.error("--ascii requires --mode graph")
+
+
+def validate_repository(parser, args):
+    """Проверить путь к тестовым данным или адрес индекса Cargo."""
     if args.test:
         if not Path(args.repo).is_file():
             parser.error("--test requires --repo to name an existing file")
-    else:
-        try:
-            url = urlsplit(args.repo.removeprefix("sparse+"))
-        except ValueError:
-            parser.error("invalid --repo URL")
-        if url.scheme not in {"http", "https"} or not url.hostname:
-            parser.error("--repo must be an HTTP(S) Cargo index URL")
-    return args
+        return
+    try:
+        url = urlsplit(args.repo.removeprefix("sparse+"))
+    except ValueError:
+        parser.error("invalid --repo URL")
+    if url.scheme not in {"http", "https"} or not url.hostname:
+        parser.error("--repo must be an HTTP(S) Cargo index URL")
 
 
 def print_direct(args):

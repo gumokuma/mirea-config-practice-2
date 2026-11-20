@@ -4,13 +4,18 @@ from functools import cache
 from urllib.request import urlopen
 
 
+MAX_UNSHARDED_NAME_LENGTH = 2
+SINGLE_PREFIX_NAME_LENGTH = 3
+
+
 def index_path(name):
     """Построить относительный путь записи crate."""
     name = name.lower()
-    if len(name) <= 2:
-        return f"{len(name)}/{name}"
-    if len(name) == 3:
-        return f"3/{name[0]}/{name}"
+    length = len(name)
+    if length <= MAX_UNSHARDED_NAME_LENGTH:
+        return f"{length}/{name}"
+    if length == SINGLE_PREFIX_NAME_LENGTH:
+        return f"{length}/{name[0]}/{name}"
     return f"{name[:2]}/{name[2:4]}/{name}"
 
 

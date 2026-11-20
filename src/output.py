@@ -8,13 +8,19 @@ def label(node):
     return f"{name}@{version}" if version else name
 
 
-def load_order(graph):
-    """Вернуть порядок зависимостей и узлы, заблокированные циклом."""
-    remaining = {node: len(children) for node, children in graph.items()}
+def reverse_edges(graph):
+    """Сопоставить каждой зависимости список использующих её пакетов."""
     dependents = {node: [] for node in graph}
     for node, children in graph.items():
         for child in children:
             dependents[child].append(node)
+    return dependents
+
+
+def load_order(graph):
+    """Вернуть порядок зависимостей и узлы, заблокированные циклом."""
+    remaining = {node: len(children) for node, children in graph.items()}
+    dependents = reverse_edges(graph)
     ready = deque(node for node in graph if remaining[node] == 0)
     order = []
     while ready:

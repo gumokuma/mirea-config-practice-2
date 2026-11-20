@@ -1,5 +1,11 @@
 """Сопоставление опубликованных версий с требованиями Cargo."""
 import re
+from operator import eq, ge, gt, le, lt
+
+
+FULL_VERSION_PARTS = 3
+TILDE_PREFIX_PARTS = 2
+COMPARISONS = {"=": eq, ">": gt, "<": lt, ">=": ge, "<=": le}
 
 
 def version_key(text):
@@ -35,24 +41,24 @@ def compare(candidate, rule):
     if operator == "*":
         return True
     width = len(parts)
-    release = ".".join(map(str, parts + (0,) * (3 - width)))
+    release = ".".join(map(str, parts + (0,) * (FULL_VERSION_PARTS - width)))
     lower = version_key(release + (prerelease or ""))
-    partial = candidate[0][:width]
-    if operator == "=":
-        return candidate == lower if width == 3 else partial == parts
-    if operator == ">":
-        return candidate > lower if width == 3 else partial > parts
-    if operator == "<":
-        return candidate < lower if width == 3 else partial < parts
-    if operator == ">=":
-        return candidate >= lower if width == 3 else partial >= parts
-    if operator == "<=":
-        return candidate <= lower if width == 3 else partial <= parts
+    comparison = COMPARISONS.get(operator)
+    if comparison is not None:
+        if width == FULL_VERSION_PARTS:
+            return comparison(candidate, lower)
+        return comparison(candidate[0][:width], parts)
     if operator == "~":
-        bound = min(width, 2)
+        bound = min(width, TILDE_PREFIX_PARTS)
     else:
         bound = next((i + 1 for i, n in enumerate(parts) if n), width)
     return candidate >= lower and candidate[0][:bound] == parts[:bound]
+
+
+def prerelease_allowed(key, rules):
+    """Допустить предварительную версию при совпадении ядра SemVer."""
+    release, stable, _ = key
+    return stable or any(pre and parts == release for _, parts, pre in rules)
 
 
 def latest(records, requirement):
@@ -63,9 +69,7 @@ def latest(records, requirement):
         if record.get("yanked"):
             continue
         key = version_key(record["vers"])
-        if not key[1] and not any(
-            pre and parts == key[0] for _, parts, pre in rules
-        ):
+        if not prerelease_allowed(key, rules):
             continue
         if all(compare(key, rule) for rule in rules):
             matches.append(record)
